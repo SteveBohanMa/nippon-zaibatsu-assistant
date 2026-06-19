@@ -1,0 +1,5 @@
+# 財閥 对局助手 —— 打包/运行依赖
+# 应用本身（前端 HTML/JS）零依赖，以下仅用于生成 .exe 外壳窗口。
+
+pywebview>=4.4      # 原生窗口（Windows 上自动使用系统 WebView2）
+pyinstaller>=6.0    # 打包成单文件 .exe

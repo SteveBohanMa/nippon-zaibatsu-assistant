@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>財閥 — 对局助手</title>
+<style>
+/* ============================ 设计令牌 ============================ *
+ * 明治工业：墨黑 sumi / 朱印红 / 和纸米白 / 黄铜金 / 苔绿（推荐）
+ * 系统字体（离线运行，无网络字体）
+ * ================================================================ */
+:root{
+  --sumi:#141821;        /* 墨黑底 */
+  --sumi-2:#1b2230;      /* 面板底 */
+  --sumi-3:#232c3d;      /* 抬升面 */
+  --line:#33405a;        /* 分隔/黄铜暗线 */
+  --washi:#ece4d2;       /* 和纸米白 */
+  --washi-dim:#bfb7a3;
+  --ink:#0c0f15;
+  --vermilion:#d4503a;   /* 朱印红 */
+  --vermilion-deep:#a8331f;
+  --brass:#c79a4b;       /* 黄铜金 */
+  --jade:#46a07a;        /* 推荐/正向 */
+  --jade-deep:#2f7a59;
+  --muted:#7d889c;
+  --danger:#e07a5f;
+  --r:8px;
+  --shadow:0 8px 30px rgba(0,0,0,.45);
+  --serif:'Songti SC','SimSun','Noto Serif CJK SC',Georgia,'Times New Roman',serif;
+  --sans:-apple-system,'PingFang SC','Microsoft YaHei','Noto Sans CJK SC','Segoe UI',sans-serif;
+  --mono:'SFMono-Regular',Consolas,'Liberation Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(199,154,75,.07), transparent 60%),
+    radial-gradient(900px 500px at 100% 110%, rgba(212,80,58,.06), transparent 60%),
+    var(--sumi);
+  color:var(--washi); font-family:var(--sans); font-size:14px; line-height:1.5;
+  -webkit-font-smoothing:antialiased; overflow:hidden;
+}
+button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--brass); outline-offset:2px}
+h1,h2,h3{font-family:var(--serif); font-weight:600; letter-spacing:.02em}
+.scroll{overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--line) transparent}
+.scroll::-webkit-scrollbar{width:8px}
+.scroll::-webkit-scrollbar-thumb{background:var(--line); border-radius:4px}
+
+/* ============================ 顶部题头 ============================ */
+.topbar{
+  height:54px; display:flex; align-items:center; gap:16px; padding:0 20px;
+  border-bottom:1px solid var(--brass);
+  box-shadow:inset 0 -3px 0 -2px rgba(199,154,75,.35);
+  background:linear-gradient(180deg,#163842,var(--sumi-2)); /* 呼应规则书封面 teal+gold */
+}
+.brand b{background:linear-gradient(180deg,#e4c878,var(--brass));-webkit-background-clip:text;background-clip:text;color:transparent}
+.seal{
+  width:34px;height:34px;border-radius:6px;flex:0 0 auto;
+  background:var(--vermilion); color:var(--washi);
+  display:grid;place-items:center; font-family:var(--serif); font-size:20px; font-weight:700;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.18), var(--shadow);
+  transform:rotate(-3deg);
+}
+.brand{display:flex;flex-direction:column;line-height:1.1}
+.brand b{font-family:var(--serif);font-size:17px;letter-spacing:.08em}
+.brand span{font-size:11px;color:var(--muted);letter-spacing:.18em;text-transform:uppercase}
+.topbar .meta{margin-left:auto;display:flex;gap:10px;align-items:center}
+.chip{
+  font-size:12px;padding:4px 10px;border:1px solid var(--line);border-radius:20px;
+  color:var(--washi-dim); background:var(--sumi-3); white-space:nowrap;
+}
+.chip b{color:var(--brass);font-weight:600}
+
+/* ============================ 通用控件 ============================ */
+.btn{
+  padding:8px 14px;border-radius:var(--r);font-size:13px;font-weight:600;
+  background:var(--sumi-3);color:var(--washi);border:1px solid var(--line);
+  transition:.12s; white-space:nowrap;
+}
+.btn:hover{border-color:var(--brass);color:#fff}
+.btn.primary{background:var(--vermilion);border-color:var(--vermilion);color:#fff}
+.btn.primary:hover{background:var(--vermilion-deep)}
+.btn.jade{background:var(--jade);border-color:var(--jade);color:#fff}
+.btn.jade:hover{background:var(--jade-deep)}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.sm{padding:5px 9px;font-size:12px}
+label.fld{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;letter-spacing:.04em}
+input[type=text],input[type=number],select{
+  width:100%;padding:8px 10px;background:var(--ink);color:var(--washi);
+  border:1px solid var(--line);border-radius:6px;font-family:var(--sans);font-size:13px;
+}
+input[type=number]{font-family:var(--mono)}
+
+/* 步进器 */
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--ink)}
+.stepper button{width:26px;height:30px;background:var(--sumi-3);font-size:16px;color:var(--washi-dim)}
+.stepper button:hover{color:var(--brass)}
+.stepper .val{min-width:38px;text-align:center;font-family:var(--mono);font-size:14px;color:var(--washi)}
+.stepper.hot .val{color:var(--brass);font-weight:700}
+
+/* ============================ 起始向导 ============================ */
+#setup{position:absolute;inset:54px 0 0 0;display:flex;align-items:center;justify-content:center;padding:24px}
+.wizard{width:min(720px,94vw);background:var(--sumi-2);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.wizard-head{padding:22px 28px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(199,154,75,.06),transparent)}
+.wizard-head h2{font-size:22px}
+.wizard-head p{color:var(--muted);font-size:13px;margin-top:4px}
+.steps-nav{display:flex;gap:0;padding:0 28px;border-bottom:1px solid var(--line)}
+.steps-nav div{padding:12px 4px;margin-right:26px;font-size:13px;color:var(--muted);border-bottom:2px solid transparent}
+.steps-nav div.on{color:var(--washi);border-color:var(--vermilion)}
+.steps-nav div .num{font-family:var(--serif);color:var(--brass);margin-right:7px}
+.wizard-body{padding:26px 28px;min-height:240px}
+.wizard-foot{padding:18px 28px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.optgrid{display:grid;gap:12px}
+.optgrid.c2{grid-template-columns:1fr 1fr}
+.optgrid.c3{grid-template-columns:repeat(3,1fr)}
+.optcard{
+  border:1px solid var(--line);border-radius:10px;padding:16px;background:var(--sumi-3);
+  transition:.12s;text-align:left;
+}
+.optcard:hover{border-color:var(--brass)}
+.optcard.sel{border-color:var(--vermilion);background:rgba(212,80,58,.1);box-shadow:inset 0 0 0 1px var(--vermilion)}
+.optcard b{display:block;font-size:15px;font-family:var(--serif);margin-bottom:4px}
+.optcard small{color:var(--muted);font-size:12px;line-height:1.45;display:block}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+.note{font-size:12px;color:var(--muted);background:var(--ink);border-left:3px solid var(--brass);padding:10px 12px;border-radius:0 6px 6px 0;margin-top:6px}
+.note.todo{border-color:var(--vermilion)}
+
+/* ============================ 对局主界面 ============================ */
+#game{position:absolute;inset:54px 0 56px 0;display:none;grid-template-columns:1fr 420px}
+#game.show{display:grid}
+.pane{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.pane:last-child{border-right:none}
+.pane-head{padding:11px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;background:var(--sumi-2)}
+.pane-head h3{font-size:14px;letter-spacing:.06em}
+.pane-head .tag{font-size:11px;color:var(--muted);margin-left:auto}
+.pane-body{flex:1;min-height:0;padding:16px;overflow-y:auto}
+
+/* —— 左：地图 —— */
+.board-section{margin-bottom:20px}
+.board-section > h4{
+  font-family:var(--serif);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--brass);margin-bottom:9px;padding-bottom:5px;border-bottom:1px dashed var(--line);
+}
+.workers{display:flex;gap:4px;flex-wrap:wrap}
+.wk{width:18px;height:18px;border-radius:4px;border:1px solid rgba(255,255,255,.18);cursor:pointer}
+.wk.empty{background:transparent;border-style:dashed;opacity:.5}
+
+/* —— 右：玩家板 —— */
+.tabs{display:flex;gap:4px;padding:8px 12px 0;border-bottom:1px solid var(--line);background:var(--sumi-2);flex-wrap:wrap}
+.tab{padding:7px 12px;font-size:12px;color:var(--muted);border:1px solid transparent;border-bottom:none;border-radius:7px 7px 0 0}
+.tab.on{color:var(--washi);background:var(--sumi-3);border-color:var(--line)}
+.tab .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.tab.me{font-weight:700}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin-bottom:16px}
+.stat{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.stat .k{font-size:12px;color:var(--washi-dim)}
+.stat.hl{background:rgba(70,160,122,.12);margin:-4px -6px;padding:4px 6px;border-radius:6px;box-shadow:inset 0 0 0 1px var(--jade)}
+.subhead{font-family:var(--serif);font-size:12px;letter-spacing:.1em;color:var(--brass);margin:14px 0 8px;text-transform:uppercase}
+.track-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.track-row .nm{width:46px;font-size:12px;color:var(--washi-dim)}
+.track-bar{flex:1;height:10px;background:var(--ink);border-radius:5px;position:relative;overflow:hidden;border:1px solid var(--line)}
+.track-bar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--brass),var(--vermilion));border-radius:5px}
+.track-bar .thr{position:absolute;top:-2px;bottom:-2px;width:1px;background:rgba(236,228,210,.4)}
+.list-line{display:flex;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:var(--sumi-3);margin-bottom:6px;font-size:12px}
+.list-line .x{margin-left:auto;color:var(--muted);font-size:15px;line-height:1}
+.list-line .x:hover{color:var(--danger)}
+.pill{font-size:10px;padding:2px 6px;border-radius:10px;background:var(--ink);color:var(--brass);border:1px solid var(--line)}
+.empty-hint{font-size:12px;color:var(--muted);font-style:italic;padding:6px 0}
+.add-row{display:flex;gap:6px;margin-top:6px}
+.add-row select,.add-row input{flex:1}
+
+/* —— 底栏 —— */
+.bottombar{
+  position:absolute;left:0;right:0;bottom:0;height:56px;display:flex;align-items:center;gap:10px;
+  padding:0 16px;border-top:1px solid var(--line);
+  background:linear-gradient(0deg,var(--sumi-2),rgba(27,34,48,.7));z-index:20;
+}
+.bottombar .turn-ind{font-size:12px;color:var(--muted)}
+.bottombar .turn-ind b{color:var(--washi)}
+.bottombar .spacer{flex:1}
+
+/* —— 推荐抽屉（签名元素：朱印推荐卡）—— */
+#solver{
+  position:absolute;top:54px;right:0;bottom:56px;width:480px;max-width:92vw;
+  background:var(--sumi-2);border-left:1px solid var(--brass);box-shadow:-12px 0 40px rgba(0,0,0,.5);
+  transform:translateX(105%);transition:transform .28s cubic-bezier(.2,.8,.2,1);
+  display:flex;flex-direction:column;z-index:30;
+}
+#solver.open{transform:translateX(0)}
+.solver-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+.solver-head h3{font-size:16px}
+.solver-head .close{margin-left:auto;font-size:22px;color:var(--muted);width:30px;height:30px;border-radius:6px}
+.solver-head .close:hover{color:var(--washi);background:var(--sumi-3)}
+.solver-body{flex:1;overflow-y:auto;padding:20px}
+.rec-card{
+  position:relative;border:1px solid var(--jade);border-radius:12px;padding:18px 18px 16px;
+  background:linear-gradient(180deg,rgba(70,160,122,.12),rgba(70,160,122,.04));margin-bottom:18px;
+}
+.rec-card .stamp{
+  position:absolute;top:-14px;right:14px;width:48px;height:48px;border-radius:8px;
+  background:var(--vermilion);color:#fff;display:grid;place-items:center;
+  font-family:var(--serif);font-size:22px;font-weight:700;transform:rotate(-6deg);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.25),var(--shadow);
+}
+.rec-card .eyebrow{font-size:11px;letter-spacing:.16em;color:var(--jade);text-transform:uppercase;margin-bottom:6px}
+.rec-card .title{font-family:var(--serif);font-size:19px;line-height:1.25;margin-bottom:6px;padding-right:46px}
+.rec-card .detail{font-size:13px;color:var(--washi-dim)}
+.rec-card .delta{display:inline-block;margin-top:10px;font-family:var(--mono);font-size:13px;color:var(--jade);background:rgba(70,160,122,.15);padding:3px 9px;border-radius:6px}
+.reasons{list-style:none;margin:0 0 18px}
+.reasons li{position:relative;padding:7px 0 7px 20px;font-size:13px;border-bottom:1px solid rgba(51,64,90,.5);line-height:1.5}
+.reasons li:before{content:'';position:absolute;left:2px;top:13px;width:7px;height:7px;background:var(--brass);border-radius:1px;transform:rotate(45deg)}
+.alts h4{font-family:var(--serif);font-size:12px;letter-spacing:.1em;color:var(--brass);text-transform:uppercase;margin-bottom:10px}
+.alt{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:7px;background:var(--sumi-3)}
+.alt .rank{font-family:var(--serif);color:var(--muted);font-size:14px;width:18px}
+.alt .info{flex:1;min-width:0}
+.alt .info b{font-size:13px;font-weight:600;display:block}
+.alt .info small{font-size:11px;color:var(--muted)}
+.alt .gap{font-family:var(--mono);font-size:12px;color:var(--danger);white-space:nowrap}
+.breakdown{margin-top:8px;font-size:11px;color:var(--muted);font-family:var(--mono);line-height:1.7}
+.breakdown span{color:var(--washi-dim)}
+
+/* 模态 */
+.modal-bg{position:absolute;inset:0;background:rgba(8,12,21,.7);display:none;align-items:center;justify-content:center;z-index:50}
+.modal-bg.show{display:flex}
+.modal{width:min(440px,92vw);background:var(--sumi-2);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.modal h3{padding:16px 20px;border-bottom:1px solid var(--line);font-size:15px}
+.modal .mbody{padding:18px 20px}
+.modal .mfoot{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end}
+.toast{position:absolute;bottom:70px;left:50%;transform:translateX(-50%);background:var(--sumi-3);border:1px solid var(--brass);color:var(--washi);padding:10px 18px;border-radius:8px;font-size:13px;box-shadow:var(--shadow);z-index:60;opacity:0;transition:.25s;pointer-events:none}
+/* ============================ 图1：地图风格组件 ============================ */
+/* —— 雇用区：图标卡 + 上方工人槛 —— */
+.hiring-strip{display:flex;gap:8px;flex-wrap:wrap}
+.hire-cell2{display:flex;flex-direction:column;align-items:center;gap:6px;width:108px}
+.hire-cell2 .wk-row{display:flex;gap:3px}
+.hire-cell2 .wk-row .wk{width:16px;height:16px;border-radius:50%}
+.act-tile{
+  width:100%;min-height:54px;border-radius:8px;border:1px solid var(--line);
+  background:linear-gradient(160deg,var(--sumi-3),var(--sumi-2));
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  padding:6px 4px;position:relative;
+}
+.act-tile .ic{font-size:18px;line-height:1}
+.act-tile .nm{font-size:10.5px;color:var(--washi-dim);letter-spacing:.04em}
+.act-tile.act-rnd{border-top:3px solid #6fa8c9}
+.act-tile.act-mining{border-top:3px solid #8a8f99}
+.act-tile.act-factory{border-top:3px solid #a85a44}
+.act-tile.act-machine{border-top:3px solid #c79a4b}
+.act-tile.act-produce{border-top:3px solid #6a7480}
+.act-tile.act-ship{border-top:3px solid #3f7fa8}
+.act-tile.act-train{border-top:3px solid #c9783f}
+.act-tile.act-localMarket{border-top:3px solid #46a07a}
+.act-tile.act-invest{border-top:3px solid #2e6fb0}
+
+/* —— 工人列候补 —— */
+.queue-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.queue-row .lbl{width:34px;font-size:11px;color:var(--muted)}
+
+/* —— 地区菱形瓦片（呼应海图上的需求方块）—— */
+.region-tile-wrap{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+.region-tile-wrap.col{flex-direction:column}
+.region-card{
+  border:1px solid var(--line);border-radius:10px;background:var(--sumi-3);
+  padding:10px;width:100%;position:relative;
+}
+.region-card.hl{border-color:var(--jade);box-shadow:0 0 0 1px var(--jade),0 0 16px rgba(70,160,122,.3)}
+.region-top{display:flex;align-items:center;gap:12px}
+.region-diamond{
+  width:58px;height:58px;flex:0 0 auto;position:relative;transform:rotate(45deg);
+  border-radius:6px;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.35), var(--shadow);
+}
+.region-diamond .quad{position:absolute;width:50%;height:50%}
+.region-diamond .q1{top:0;left:0} .region-diamond .q2{top:0;left:50%}
+.region-diamond .q3{top:50%;left:0} .region-diamond .q4{top:50%;left:50%}
+.region-diamond .center{
+  position:absolute;inset:0;display:grid;place-items:center;transform:rotate(-45deg);
+  font-size:11px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);
+}
+.region-info{flex:1;min-width:0}
+.region-info .nm{font-size:14px;font-weight:700;font-family:var(--serif)}
+.region-info .tally{font-size:11px;color:var(--brass);margin-top:2px}
+.region-info .badges{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.region-info .badge{font-size:10px;padding:2px 7px;border-radius:10px;background:var(--ink);border:1px solid var(--line);color:var(--washi-dim)}
+.rg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(74px,1fr));gap:7px;margin-top:9px;padding-top:9px;border-top:1px dashed var(--line)}
+
+/* —— 岩仓使节团 2x3 表 —— */
+.iwakura-table{border:1px solid var(--brass);border-radius:10px;overflow:hidden;background:var(--sumi-3)}
+.iwakura-title{
+  text-align:center;font-family:var(--serif);font-size:11px;letter-spacing:.18em;
+  padding:6px;background:linear-gradient(180deg,#163842,var(--sumi-2));color:var(--brass);
+  text-transform:uppercase;border-bottom:1px solid var(--line);
+}
+.iwakura-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line)}
+.iwakura-cell{
+  background:var(--sumi-3);padding:9px 10px;display:flex;flex-direction:column;gap:6px;
+  cursor:pointer;transition:.12s;
+}
+.iwakura-cell:hover{background:var(--sumi-2)}
+.iwakura-cell.taken{opacity:.45}
+.iwakura-cell .iw-head{display:flex;align-items:center;justify-content:space-between}
+.iwakura-cell .iw-name{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--washi-dim)}
+.iwakura-cell .iw-swatches{display:flex;gap:5px}
+.iw-swatch{width:16px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,.25)}
+.iwakura-cell .iw-state{font-size:10px;color:var(--muted)}
+.iwakura-cell.taken .iw-state{color:var(--vermilion)}
+
+/* —— 工厂池 —— */
+.pool-strip{display:flex;flex-wrap:wrap;gap:6px}
+
+/* ============================ 图2：财阀板 ============================ */
+.zb-board{
+  border:1px solid #5a3f7a;border-radius:12px;overflow:hidden;
+  background:linear-gradient(165deg,#241c33,#1a1525);margin-bottom:18px;
+}
+.zb-row{display:flex;gap:0;border-bottom:1px solid #3d2c54}
+.zb-row:last-child{border-bottom:none}
+
+/* 部门列（左） */
+.zb-depts{display:flex;flex-direction:column;gap:5px;padding:10px 8px;width:108px;flex:0 0 auto;background:rgba(0,0,0,.18)}
+.dept-tile{
+  display:flex;align-items:center;gap:6px;padding:5px 7px;border-radius:6px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.08);font-size:10.5px;color:#fff;
+}
+.dept-tile .sw{width:13px;height:13px;border-radius:3px;flex:0 0 auto;border:1px solid rgba(255,255,255,.3)}
+.dept-tile .v{margin-left:auto;font-family:var(--mono);opacity:.85}
+.dept-tile.upgraded{box-shadow:0 0 0 1px var(--brass) inset}
+.dept-tile.off{opacity:.35}
+
+/* 中部：三轨 + 计分轨 */
+.zb-mid{flex:1;padding:12px 14px;min-width:0}
+.zb-track{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.zb-track .tn{width:42px;font-size:11px;color:var(--washi-dim);flex:0 0 auto}
+.zb-ladder{display:flex;gap:3px;flex:1;flex-wrap:wrap}
+.zb-pip{
+  width:20px;height:20px;border-radius:50%;background:var(--ink);border:1px solid #4a3868;
+  display:grid;place-items:center;font-size:8.5px;color:var(--muted);cursor:pointer;flex:0 0 auto;
+}
+.zb-pip.on{background:linear-gradient(160deg,#b48de0,#7d4fb8);color:#fff;border-color:#b48de0}
+.zb-pip.bonus{border-color:var(--brass)}
+.zb-score-row{display:flex;gap:3px;flex-wrap:wrap;margin-top:8px}
+.zb-score-pip{width:14px;height:14px;border-radius:50%;background:#2d6b46;border:1px solid #41875b}
+.zb-score-pip.on{background:var(--jade);box-shadow:0 0 0 2px rgba(70,160,122,.4)}
+
+/* 右侧：船/设备/火车 阶梯 */
+.zb-side{display:flex;flex-direction:column-reverse;gap:3px;padding:10px 8px;width:108px;flex:0 0 auto;background:rgba(0,0,0,.18)}
+.zb-side-group{display:flex;flex-direction:column;gap:3px}
+.zb-side-h{font-size:9.5px;color:var(--muted);text-align:center;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
+.zb-ship-row{display:flex;align-items:center;justify-content:center;gap:5px}
+
+/* 工厂区（底部，横排建筑） */
+.zb-factories{padding:12px 14px;background:rgba(0,0,0,.12)}
+.factory-row{display:flex;gap:8px;flex-wrap:wrap}
+.factory-slot{
+  width:96px;border-radius:8px;border:1px solid #4a3868;background:rgba(255,255,255,.03);
+  padding:7px;display:flex;flex-direction:column;gap:5px;position:relative;
+}
+.factory-slot.empty{align-items:center;justify-content:center;min-height:64px;border-style:dashed;opacity:.5}
+.factory-slot .ftype{font-size:10.5px;font-weight:700;color:#fff}
+.factory-slot .flv{font-size:9px;color:var(--brass)}
+.factory-slot .fgoods{display:flex;gap:2px}
+.fgoods-pip{width:9px;height:9px;border-radius:2px;background:#b08a4a}
+.factory-slot .fmach{display:flex;gap:3px;font-size:9px;color:var(--muted)}
+.factory-slot .x{position:absolute;top:3px;right:5px;font-size:13px;color:var(--muted);cursor:pointer}
+.factory-slot .x:hover{color:var(--danger)}
+
+/* 个人目标（恩赐）行 */
+.zb-favors{display:flex;gap:8px;padding:10px 14px;flex-wrap:wrap;background:rgba(0,0,0,.08)}
+.favor-slot{
+  display:flex;align-items:center;gap:6px;padding:5px 9px;border-radius:14px;cursor:pointer;
+  background:#3d2c54;border:1px solid #5a3f7a;font-size:11px;color:#e8d9ff;
+}
+.favor-slot.lv1{border-color:#8a6fb8}.favor-slot.lv2{border-color:#b48de0}.favor-slot.lv3{border-color:var(--brass)}
+.favor-slot .lv{font-family:var(--mono);font-weight:700}
+
+/* ============================ 海图视图（忠实盘面布局 image2）============== */
+.chart{
+  position:relative;border:2px solid #2a4a55;border-radius:12px;overflow:hidden;
+  background:
+    radial-gradient(120% 90% at 60% 40%, #1c5364 0%, #143e4c 45%, #102f3a 100%);
+  min-height:560px;margin-bottom:18px;box-shadow:inset 0 0 60px rgba(0,0,0,.4);
+}
+/* 计分轨边框（盘面四周的数字环，示意化）*/
+.chart::before{
+  content:'';position:absolute;inset:6px;border:1px dashed rgba(199,154,75,.25);border-radius:8px;pointer-events:none;
+}
+/* 陆地剪影（日本列岛，抽象色块）*/
+.chart .land{
+  position:absolute;inset:0;pointer-events:none;opacity:.5;
+  background:
+    radial-gradient(40% 26% at 33% 62%, #6b5a3a 0%, transparent 60%),
+    radial-gradient(34% 22% at 56% 50%, #6b5a3a 0%, transparent 60%),
+    radial-gradient(30% 24% at 76% 40%, #6b5a3a 0%, transparent 62%),
+    radial-gradient(22% 16% at 24% 50%, #6b5a3a 0%, transparent 60%);
+  filter:blur(2px);
+}
+/* 顶部雇用区/行动条覆盖层 */
+.chart-topstrip{
+  position:absolute;left:12px;right:12px;top:10px;z-index:3;
+  display:flex;gap:10px;align-items:flex-start;
+}
+.chart-queue{
+  background:rgba(13,28,36,.82);border:1px solid var(--brass);border-radius:8px;padding:6px;flex:0 0 auto;
+}
+.chart-queue .qttl{font-size:9px;color:var(--brass);letter-spacing:.08em;text-align:center;margin-bottom:4px;text-transform:uppercase}
+.chart-hiring{
+  background:rgba(13,28,36,.82);border:1px solid var(--brass);border-radius:8px;padding:6px 8px;flex:1;
+  overflow-x:auto;
+}
+.chart-hiring .hh{font-size:9px;color:var(--brass);letter-spacing:.08em;margin-bottom:5px;text-transform:uppercase}
+/* 地区菱形在海图上的绝对定位锚点 */
+.chart-region{position:absolute;z-index:2;transform:translate(-50%,-50%);cursor:pointer}
+.chart-region .dia{
+  width:74px;height:74px;position:relative;transform:rotate(45deg);border-radius:8px;overflow:hidden;
+  box-shadow:0 0 0 1px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.5);transition:.12s;
+}
+.chart-region:hover .dia{box-shadow:0 0 0 2px var(--brass),0 4px 18px rgba(0,0,0,.6)}
+.chart-region.sel .dia{box-shadow:0 0 0 3px var(--jade),0 0 22px rgba(70,160,122,.5)}
+.chart-region .dia .quad{position:absolute;width:50%;height:50%}
+.chart-region .dia .q1{top:0;left:0}.chart-region .dia .q2{top:0;left:50%}
+.chart-region .dia .q3{top:50%;left:0}.chart-region .dia .q4{top:50%;left:50%}
+.chart-region .dia .gx{
+  position:absolute;inset:0;transform:rotate(-45deg);display:grid;place-items:center;
+  font-size:10px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7);text-align:center;line-height:1.15;
+}
+.chart-region .rlabel{
+  position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:8px;white-space:nowrap;
+  font-size:10px;color:var(--washi);background:rgba(13,28,36,.85);padding:2px 7px;border-radius:10px;border:1px solid var(--line);
+}
+.chart-region .rlabel b{color:var(--brass)}
+/* 海外公司丸数字（灰色圆牌）*/
+.chart-overseas{
+  position:absolute;z-index:2;transform:translate(-50%,-50%);
+  width:26px;height:26px;border-radius:50%;background:#8a8f99;color:#1a1a1a;
+  display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:12px;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.3),0 2px 6px rgba(0,0,0,.5);border:1px solid #5a5f66;
+}
+/* 岩仓使节团（海图右下角覆盖层）*/
+.chart-iwakura{position:absolute;right:12px;bottom:12px;z-index:3;width:240px}
+/* 地区详情编辑抽出层（点选地区后在海图下方出现）*/
+.region-editor{
+  border:1px solid var(--jade);border-radius:10px;background:var(--sumi-3);padding:12px;margin-bottom:18px;
+}
+.region-editor h4{font-family:var(--serif);font-size:13px;color:var(--jade);margin-bottom:4px}
+.region-editor .meta-line{font-size:11px;color:var(--washi-dim);margin-bottom:10px}
+.demand-row{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.demand-chip{
+  display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:12px;
+  background:var(--ink);border:1px solid var(--line);color:var(--washi-dim);cursor:pointer;
+}
+.demand-chip .lv{font-size:9px;color:var(--brass)}
+.goods-sw{width:12px;height:12px;border-radius:3px;border:1px solid rgba(255,255,255,.3)}
+/* 市场 4 影响力格示意 */
+.market-spaces{display:flex;gap:5px;margin:6px 0}
+.mk-space{
+  flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;background:var(--ink);padding:5px 4px;text-align:center;
+}
+.mk-space .who{font-size:10px;color:var(--washi-dim)}
+.mk-space .val{font-family:var(--mono);font-size:13px;color:var(--brass)}
+.mk-space.mine{border-color:var(--jade);background:rgba(70,160,122,.12)}
+.mk-space.rival{border-color:var(--vermilion);background:rgba(212,80,58,.1)}
+.contract-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px}
+.contract-card{
+  border:2px solid #5a3f7a;border-radius:8px;background:linear-gradient(165deg,#3d2c54,#241c33);
+  padding:10px 8px 8px;text-align:center;cursor:pointer;position:relative;transition:.12s;
+  min-height:78px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+}
+.contract-card:hover{border-color:var(--brass)}
+.contract-card .c-ic{
+  width:34px;height:34px;border-radius:6px;display:grid;place-items:center;font-size:16px;color:#fff;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.2);
+}
+.contract-card .c-lv{font-size:9px;color:var(--washi-dim)}
+.contract-card .c-check{
+  position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;
+  background:var(--jade);color:#fff;display:none;place-items:center;font-size:13px;font-weight:700;
+  box-shadow:var(--shadow);
+}
+.contract-card.done .c-check{display:grid}
+.contract-card.done{opacity:.75;border-color:var(--jade)}
+
+/* ============================ 图4：起始标记卡 ============================ */
+.token-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:10px;margin-top:14px}
+.token-card{border-radius:10px;overflow:hidden;border:2px solid var(--line);cursor:pointer;transition:.12s}
+.token-card:hover{border-color:var(--brass)}
+.token-card.sel{border-color:var(--vermilion);box-shadow:0 0 0 1px var(--vermilion)}
+.token-a{
+  background:linear-gradient(160deg,#d8c49a,#b89968);padding:12px 8px;text-align:center;position:relative;
+}
+.token-a .ic{font-size:22px}
+.token-a .val{
+  position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:#d99a3a;
+  color:#fff;display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:12px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.4);
+}
+.token-b{background:#16323d;padding:8px;text-align:center}
+.token-b small{color:#9fc9c9;font-size:10px;line-height:1.4;display:block}
+</style>
+</head>
+<body>
+
+<!-- ===================== 题头 ===================== -->
+<div class="topbar">
+  <div class="seal">財</div>
+  <div class="brand"><b>財閥 対局助手</b><span>Meiji Restoration · Zaibatsu</span></div>
+  <div class="meta" id="topMeta"></div>
+</div>
+
+<!-- ===================== 起始向导 ===================== -->
+<div id="setup">
+  <div class="wizard">
+    <div class="wizard-head">
+      <h2>新对局设置</h2>
+      <p>三步走：人数与位次 → 初始化我方状态 → 进入对局求解。</p>
+    </div>
+    <div class="steps-nav" id="stepsNav">
+      <div data-s="1" class="on"><span class="num">壹</span>人数 · 位次 · 偏好</div>
+      <div data-s="2"><span class="num">弐</span>初始化状态</div>
+      <div data-s="3"><span class="num">参</span>开始对局</div>
+    </div>
+    <div class="wizard-body" id="wizardBody"></div>
+    <div class="wizard-foot">
+      <button class="btn ghost" id="wzBack" disabled>← 上一步</button>
+      <button class="btn primary" id="wzNext">下一步 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 对局主界面 ===================== -->
+<div id="game">
+  <!-- 左：地图 -->
+  <div class="pane">
+    <div class="pane-head"><h3>桌面 · 地图</h3><span class="tag">雇用区 / 工人列 / 地区影响力 / 工厂池</span></div>
+    <div class="pane-body scroll" id="mapBody"></div>
+  </div>
+  <!-- 右：玩家板 -->
+  <div class="pane">
+    <div class="tabs" id="playerTabs"></div>
+    <div class="pane-body scroll" id="playerBody"></div>
+  </div>
+</div>
+
+<!-- 底栏 -->
+<div class="bottombar" id="bottombar" style="display:none">
+  <div class="turn-ind" id="turnInd"></div>
+  <button class="btn sm" id="btnOpp">记录对手回合 →</button>
+  <div class="spacer"></div>
+  <button class="btn sm ghost" id="btnRound">轮重置重录</button>
+  <button class="btn sm ghost" id="btnUndo">↶ 撤销</button>
+  <button class="btn sm ghost" id="btnSave">保存</button>
+  <button class="btn sm ghost" id="btnLoad">读取</button>
+  <button class="btn jade" id="btnSolve">⚑ 我的回合 · 求最优解</button>
+</div>
+
+<!-- 推荐抽屉 -->
+<div id="solver">
+  <div class="solver-head">
+    <h3>最优解建议</h3>
+    <button class="close" id="solverClose">×</button>
+  </div>
+  <div class="solver-body scroll" id="solverBody"></div>
+</div>
+
+<!-- 模态 + toast -->
+<div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+<input type="file" id="fileInput" accept=".json" style="display:none">
+
+<script src="config.js"></script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
